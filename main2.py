@@ -1,9 +1,5 @@
-# Importe as bibliotecas necessárias
+# Crie um novo arquivo chamado streamlit_app.py com o seguinte código:
 import streamlit as st
-from snowflake.snowpark.context import get_active_session
 
-# Escreva diretamente no aplicativo
-st.title("Exemplo de Aplicativo Streamlit 🎈")
-st.write("""
-    Substitua este exemplo pelo seu próprio código!
-""")
+x = st.slider("Selecione um valor")
+st.write(f"{x} ao quadrado éllllllllllllllllllllll {x * x}")
