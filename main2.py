@@ -35,4 +35,3 @@ def create_simplex_table(num_vars, num_constraints):
 # Executar a aplicação Streamlit
 if __name__ == '__main__':
     main()
-
