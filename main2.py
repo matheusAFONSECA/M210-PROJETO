@@ -34,4 +34,3 @@ def main():
 # Executar a aplicação Streamlit
 if __name__ == '__main__':
     main()
-
