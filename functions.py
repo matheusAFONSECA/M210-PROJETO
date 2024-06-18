@@ -17,7 +17,7 @@ def create_simplex_table(num_vars, num_constraints):
 
     return simplex_table
 
-def simplex_optimization(simplex_tableau):
+def simplex_optimization(simplex_tableau, optimization_type='maximize'):
     # Remove 'cond' column for optimization purposes
     df_optimization = simplex_tableau.drop(columns=["cond"])
 
@@ -31,8 +31,13 @@ def simplex_optimization(simplex_tableau):
     # Define the variable bounds (assuming non-negativity)
     variable_bounds = {col: (0, None) for col in df_objective.index}
     
-    # Create a maximization problem
-    problem = pulp.LpProblem("Simplex Optimization", pulp.LpMaximize)
+    # Define o tipo de problema (maximização ou minimização)
+    if optimization_type == 'maximize':
+        problem = pulp.LpProblem("Simplex Optimization", pulp.LpMaximize)
+    elif optimization_type == 'minimize':
+        problem = pulp.LpProblem("Simplex Optimization", pulp.LpMinimize)
+    else:
+        raise ValueError("optimization_type deve ser 'maximize' ou 'minimize'")
     
     # Define decision variables
     variables = {name: pulp.LpVariable(name, lowBound=variable_bounds[name][0], upBound=variable_bounds[name][1])
