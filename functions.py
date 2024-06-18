@@ -1,70 +1,60 @@
 import pulp
-from time import sleep
 import streamlit as st
 import pandas as pd
-from scipy.optimize import linprog
 
 # Função que cria a tabela simplex dada a quantidade de variáveis e restrições
 def create_simplex_table(num_vars, num_constraints):
     st.subheader("Tabela Simplex")
     
     # Criação de uma tabela vazia
-    simplex_table = pd.DataFrame(columns=[f"x{i+1}" for i in range(num_vars)] + [f"s{i+1}" for i in range (num_constraints)] + ["LD"],
-                                 index=[f"Restrição {j+1}" for j in range(num_constraints)] + ["Função Objetivo"])
+    simplex_table = pd.DataFrame(columns=[f"x{i+1}" for i in range(num_vars)] + ["cond"] + ["LD"],
+                                 index=["Função Objetivo"] + [f"Restrição {j+1}" for j in range(num_constraints)])
     
-    # Preenchimento da tabela com zeros (ou valores iniciais)
-    simplex_table[:] = 0
+    # Preenche os valores padrão da tabela
+    simplex_table["cond"] = ["-"] + ["<="] * num_constraints
+    simplex_table["LD"] = 0
+    simplex_table.iloc[:, :-2] = 0  # Preenche as variáveis de decisão com 0
 
     return simplex_table
 
-# Função que resolve o tableau simplex
-def solve_tableau(simplex_table):
-    optimized_tableau = linprog(c=simplex_table.loc["Função Objetivo", :].values[:-1],
-                                A_ub=simplex_table.loc[:"Restrição 1", :].values[:, :-1],
-                                b_ub=simplex_table.loc[:"LD", :].values[:, -1],
-                                method="simplex")
-    
-    st.write("Solução do problema:")
-    st.write(optimized_tableau)
+def simplex_optimization(simplex_tableau):
+    # Remove 'cond' column for optimization purposes
+    df_optimization = simplex_tableau.drop(columns=["cond"])
 
-
-def simplex_optimization(df_objective, df_constraints, df_bounds):
-    """    
-    Parâmetros:
-    - df_objective: DataFrame com os coeficientes da função objetivo.
-    - df_constraints: DataFrame com os coeficientes das restrições e limites superiores.
-    - df_bounds: DataFrame com os limites inferiores das variáveis de decisão.
+    # Extract objective function coefficients (all columns except 'LD')
+    df_objective = df_optimization.loc["Função Objetivo", df_optimization.columns[:-1]]
     
-    Retorna:
-    - solução ótima para as variáveis de decisão.
-    - valor ótimo da função objetivo.
-    - preços sombra para cada restrição.
-    - sobras de cada restrição.
-    """
-    # Cria um problema de maximização
+    # Extract constraint coefficients and right-hand side values ('LD')
+    df_constraints = df_optimization.loc[df_optimization.index != "Função Objetivo", df_optimization.columns[:-1]]
+    df_rhs = df_optimization.loc[df_optimization.index != "Função Objetivo", "LD"]
+    
+    # Define the variable bounds (assuming non-negativity)
+    variable_bounds = {col: (0, None) for col in df_objective.index}
+    
+    # Create a maximization problem
     problem = pulp.LpProblem("Simplex Optimization", pulp.LpMaximize)
-
-    # Extrai os coeficientes da função objetivo e define as variáveis de decisão
-    objective_coeffs = df_objective.iloc[0].values
-    bounds = df_bounds.iloc[0].values
-    variables = [pulp.LpVariable(f"x{i}", lowBound=bounds[i]) for i in range(len(objective_coeffs))]
-
-    # Define a função objetivo
-    problem += pulp.lpSum([objective_coeffs[i] * variables[i] for i in range(len(objective_coeffs))])
-
-    # Adiciona as restrições
+    
+    # Define decision variables
+    variables = {name: pulp.LpVariable(name, lowBound=variable_bounds[name][0], upBound=variable_bounds[name][1])
+                 for name in df_objective.index}
+    
+    # Define the objective function
+    problem += pulp.lpSum(df_objective[name] * variables[name] for name in df_objective.index), "Objective"
+    
+    # Add constraints
     for i in range(len(df_constraints)):
-        coeffs = df_constraints.iloc[i, :-1].values
-        limit = df_constraints.iloc[i, -1]
-        problem += (pulp.lpSum([coeffs[j] * variables[j] for j in range(len(coeffs))]) <= limit, f"Restrição {i + 1}")
-
-    # Resolve o problema
+        constraint_name = df_constraints.index[i]
+        coeffs = df_constraints.iloc[i]
+        limit = df_rhs.iloc[i]
+        problem += (pulp.lpSum(coeffs[j] * variables[j] for j in df_constraints.columns) <= limit, constraint_name)
+    
+    # Solve the problem
     problem.solve(pulp.PULP_CBC_CMD(msg=True))
-
-    # Obtém os resultados
-    solution = {f"x{i}": pulp.value(variables[i]) for i in range(len(variables))}
+    
+    # Obtain the results
+    solution = {var: pulp.value(variables[var]) for var in variables}
     optimal_value = pulp.value(problem.objective)
     shadow_prices = {name: constraint.pi for name, constraint in problem.constraints.items()}
     slacks = {name: constraint.slack for name, constraint in problem.constraints.items()}
-
+    
     return solution, optimal_value, shadow_prices, slacks
