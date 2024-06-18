@@ -1,39 +1,62 @@
 import pulp
 
-# Create a maximization problem
-problem = pulp.LpProblem("Simplex Optimization", pulp.LpMaximize)
+def simplex_optimization(objective_coeffs, constraints, bounds):
+    """    
+    Parâmetros:
+    - objective_coeffs: lista de coeficientes da função objetivo.
+    - constraints: lista de tuplas contendo os coeficientes das restrições e os limites superiores.
+    - bounds: lista de limites inferiores das variáveis de decisão.
+    
+    Retorna:
+    - solução ótima para as variáveis de decisão.
+    - valor ótimo da função objetivo.
+    - preços sombra para cada restrição.
+    - sobras de cada restrição.
+    """
+    # Cria um problema de maximização
+    problem = pulp.LpProblem("Simplex Optimization", pulp.LpMaximize)
 
-# Define the decision variables
-e = pulp.LpVariable("e", lowBound=0)
-m = pulp.LpVariable("m", lowBound=0)
-a = pulp.LpVariable("a", lowBound=0)
-p = pulp.LpVariable("p", lowBound=0)
+    # Define as variáveis de decisão com os limites inferiores fornecidos
+    variables = [pulp.LpVariable(f"x{i}", lowBound=bounds[i]) for i in range(len(objective_coeffs))]
 
-# Define the objective function
-problem += 80*e + 70*m + 100*a + 16*p
+    # Define a função objetivo
+    problem += pulp.lpSum([objective_coeffs[i] * variables[i] for i in range(len(objective_coeffs))])
 
-# Define as restrições com nomes
-problem += e + m + a + 4*p <= 250, "Restrição 1"
-problem += m + a + 2*p <= 600, "Restrição 2"
-problem += 3*e + 2*m + 4*a <= 500, "Restrição 3"
+    # Adiciona as restrições
+    for i, (coeffs, limit) in enumerate(constraints):
+        problem += (pulp.lpSum([coeffs[j] * variables[j] for j in range(len(coeffs))]) <= limit, f"Restrição {i + 1}")
 
-# Habilita o log de saída
-problem.solve(pulp.PULP_CBC_CMD(msg=True))
+    # Resolve o problema
+    problem.solve(pulp.PULP_CBC_CMD(msg=True))
 
-# Print the optimal solution
+    # Obtém os resultados
+    solution = {f"x{i}": pulp.value(variables[i]) for i in range(len(variables))}
+    optimal_value = pulp.value(problem.objective)
+    shadow_prices = {name: constraint.pi for name, constraint in problem.constraints.items()}
+    slacks = {name: constraint.slack for name, constraint in problem.constraints.items()}
+
+    return solution, optimal_value, shadow_prices, slacks
+
+# Exemplo de uso da função
+objective_coeffs = [80, 70, 100, 16]
+constraints = [
+    ([1, 1, 1, 4], 250),
+    ([0, 1, 1, 2], 600),
+    ([3, 2, 4, 0], 500)
+]
+bounds = [0, 0, 0, 0]
+
+solution, optimal_value, shadow_prices, slacks = simplex_optimization(objective_coeffs, constraints, bounds)
+
 print("Solução ótima:")
-print("e =", pulp.value(e))
-print("m =", pulp.value(m))
-print("a =", pulp.value(a))
-print("s =", pulp.value(p))
-print("Z* =", pulp.value(problem.objective))
+for var, value in solution.items():
+    print(f"{var} = {value}")
+print("Z* =", optimal_value)
 
-# Imprime os preços sombra de cada restrição
 print("\nPreços sombra (multiplicadores de Lagrange) para cada restrição:")
-for name, constraint in problem.constraints.items():
-    print(f"{name}: {constraint.pi}")
+for name, price in shadow_prices.items():
+    print(f"{name}: {price}")
 
-# Imprime as sobras de cada restrição
 print("\nSobras de cada restrição:")
-for name, constraint in problem.constraints.items():
-    print(f"{name}: {constraint.slack} >= 0")
+for name, slack in slacks.items():
+    print(f"{name}: {slack} >= 0")

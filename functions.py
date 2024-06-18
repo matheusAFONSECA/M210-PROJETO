@@ -1,3 +1,4 @@
+import pulp
 from time import sleep
 import streamlit as st
 import pandas as pd
@@ -25,3 +26,41 @@ def solve_tableau(simplex_table):
     
     st.write("Solução do problema:")
     st.write(optimized_tableau)
+
+
+def simplex_optimization(objective_coeffs, constraints, bounds):
+    """  
+    Parâmetros:
+    - objective_coeffs: lista de coeficientes da função objetivo.
+    - constraints: lista de tuplas contendo os coeficientes das restrições e os limites superiores.
+    - bounds: lista de limites inferiores das variáveis de decisão.
+    
+    Retorna:
+    - solução ótima para as variáveis de decisão.
+    - valor ótimo da função objetivo.
+    - preços sombra para cada restrição.
+    - sobras de cada restrição.
+    """
+    # Cria um problema de maximização
+    problem = pulp.LpProblem("Simplex Optimization", pulp.LpMaximize)
+
+    # Define as variáveis de decisão com os limites inferiores fornecidos
+    variables = [pulp.LpVariable(f"x{i}", lowBound=bounds[i]) for i in range(len(objective_coeffs))]
+
+    # Define a função objetivo
+    problem += pulp.lpSum([objective_coeffs[i] * variables[i] for i in range(len(objective_coeffs))])
+
+    # Adiciona as restrições
+    for i, (coeffs, limit) in enumerate(constraints):
+        problem += (pulp.lpSum([coeffs[j] * variables[j] for j in range(len(coeffs))]) <= limit, f"Restrição {i + 1}")
+
+    # Resolve o problema
+    problem.solve(pulp.PULP_CBC_CMD(msg=True))
+
+    # Obtém os resultados
+    solution = {f"x{i}": pulp.value(variables[i]) for i in range(len(variables))}
+    optimal_value = pulp.value(problem.objective)
+    shadow_prices = {name: constraint.pi for name, constraint in problem.constraints.items()}
+    slacks = {name: constraint.slack for name, constraint in problem.constraints.items()}
+
+    return solution, optimal_value, shadow_prices, slacks
