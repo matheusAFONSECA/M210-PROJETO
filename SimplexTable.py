@@ -1,11 +1,12 @@
 import pulp
+import pandas as pd
 
-def simplex_optimization(objective_coeffs, constraints, bounds):
+def simplex_optimization(df_objective, df_constraints, df_bounds):
     """    
     Parâmetros:
-    - objective_coeffs: lista de coeficientes da função objetivo.
-    - constraints: lista de tuplas contendo os coeficientes das restrições e os limites superiores.
-    - bounds: lista de limites inferiores das variáveis de decisão.
+    - df_objective: DataFrame com os coeficientes da função objetivo.
+    - df_constraints: DataFrame com os coeficientes das restrições e limites superiores.
+    - df_bounds: DataFrame com os limites inferiores das variáveis de decisão.
     
     Retorna:
     - solução ótima para as variáveis de decisão.
@@ -16,14 +17,18 @@ def simplex_optimization(objective_coeffs, constraints, bounds):
     # Cria um problema de maximização
     problem = pulp.LpProblem("Simplex Optimization", pulp.LpMaximize)
 
-    # Define as variáveis de decisão com os limites inferiores fornecidos
+    # Extrai os coeficientes da função objetivo e define as variáveis de decisão
+    objective_coeffs = df_objective.iloc[0].values
+    bounds = df_bounds.iloc[0].values
     variables = [pulp.LpVariable(f"x{i}", lowBound=bounds[i]) for i in range(len(objective_coeffs))]
 
     # Define a função objetivo
     problem += pulp.lpSum([objective_coeffs[i] * variables[i] for i in range(len(objective_coeffs))])
 
     # Adiciona as restrições
-    for i, (coeffs, limit) in enumerate(constraints):
+    for i in range(len(df_constraints)):
+        coeffs = df_constraints.iloc[i, :-1].values
+        limit = df_constraints.iloc[i, -1]
         problem += (pulp.lpSum([coeffs[j] * variables[j] for j in range(len(coeffs))]) <= limit, f"Restrição {i + 1}")
 
     # Resolve o problema
@@ -38,15 +43,21 @@ def simplex_optimization(objective_coeffs, constraints, bounds):
     return solution, optimal_value, shadow_prices, slacks
 
 # Exemplo de uso da função
-objective_coeffs = [80, 70, 100, 16]
-constraints = [
-    ([1, 1, 1, 4], 250),
-    ([0, 1, 1, 2], 600),
-    ([3, 2, 4, 0], 500)
-]
-bounds = [0, 0, 0, 0]
+data_objective = {"e": [80], "m": [70], "a": [100], "p": [16]}
+data_constraints = {
+    "e": [1, 0, 3],
+    "m": [1, 1, 2],
+    "a": [1, 1, 4],
+    "p": [4, 2, 0],
+    "limit": [250, 600, 500]
+}
+data_bounds = {"e": [0], "m": [0], "a": [0], "p": [0]}
 
-solution, optimal_value, shadow_prices, slacks = simplex_optimization(objective_coeffs, constraints, bounds)
+df_objective = pd.DataFrame(data_objective)
+df_constraints = pd.DataFrame(data_constraints)
+df_bounds = pd.DataFrame(data_bounds)
+
+solution, optimal_value, shadow_prices, slacks = simplex_optimization(df_objective, df_constraints, df_bounds)
 
 print("Solução ótima:")
 for var, value in solution.items():
