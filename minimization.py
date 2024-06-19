@@ -46,34 +46,5 @@ def simplex_optimization(df_objective, df_constraints, df_bounds, optimization_t
     solution = {f"x{i}": pulp.value(variables[i]) for i in range(len(variables))}
     optimal_value = pulp.value(problem.objective)
     shadow_prices = {name: constraint.pi for name, constraint in problem.constraints.items()}
-    slacks = {name: constraint.slack for name, constraint in problem.constraints.items()}
 
-    return solution, optimal_value, shadow_prices, slacks
-
-# Define os dados do problema
-data_objective = {"x1": [2], "x2": [3]}
-data_constraints = {
-    "x1": [-1, -3],
-    "x2": [-2, -1],
-    "limit": [-4, -3]
-}
-data_bounds = {"x1": [0], "x2": [0]}
-
-df_objective = pd.DataFrame(data_objective)
-df_constraints = pd.DataFrame(data_constraints)
-df_bounds = pd.DataFrame(data_bounds)
-
-solution, optimal_value, shadow_prices, slacks = simplex_optimization(df_objective, df_constraints, df_bounds, optimization_type='minimize')
-
-print("Solução ótima:")
-for var, value in solution.items():
-    print(f"{var} = {value}")
-print("Z* =", optimal_value)
-
-print("\nPreços sombra (multiplicadores de Lagrange) para cada restrição:")
-for name, price in shadow_prices.items():
-    print(f"{name}: {price}")
-
-print("\nSobras de cada restrição:")
-for name, slack in slacks.items():
-    print(f"{name}: {slack} >= 0")
+    return solution, optimal_value, shadow_prices
